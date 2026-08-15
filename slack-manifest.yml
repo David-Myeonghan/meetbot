@@ -8,7 +8,9 @@ display_information:
   background_color: "#0E7C7B"
 features:
   bot_user:
-    display_name: 회의봇
+    # display_name은 a-z, 0-9, -, _, . 만 허용 (한글 불가 — 슬랙 공식 제약).
+    # 사용자에게 보이는 한글 이름은 display_information.name("회의봇")이 담당.
+    display_name: meetbot
     always_online: true
   slash_commands:
     - command: /meet
