@@ -246,7 +246,12 @@ export function registerHandlers(app: App, deps: Deps): void {
       const reason = diagnoseEmpty(input, opt);
       audit({ actor: requesterId, action: "candidates_empty", reason });
       const msg =
-        reason === "no_room"
+        reason === "no_room" && rooms.length === 0
+          ? {
+              r: "이 환경에 등록된 회의실이 없어요.",
+              n: "회의실 체크를 끄고 다시 잡아 보세요.",
+            }
+          : reason === "no_room"
           ? {
               r: "시간은 있는데 빈 회의실이 없어요.",
               n: "회의실 없이 잡거나, 기간 창을 넓혀 다시 시도해 보세요.",
