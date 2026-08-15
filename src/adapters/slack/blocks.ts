@@ -8,7 +8,7 @@ import type { Candidate } from "../../domain/types.js";
 
 const KST = "Asia/Seoul";
 
-function fmtSlot(start: number, end: number): string {
+export function fmtSlot(start: number, end: number): string {
   const day = new Intl.DateTimeFormat("ko-KR", {
     timeZone: KST,
     month: "long",
@@ -68,7 +68,22 @@ export function meetingForm(): View {
             { text: { type: "plain_text", text: "30분" }, value: "30" },
             { text: { type: "plain_text", text: "1시간" }, value: "60" },
             { text: { type: "plain_text", text: "1시간 30분" }, value: "90" },
+            { text: { type: "plain_text", text: "2시간" }, value: "120" },
           ],
+        },
+      },
+      {
+        type: "input",
+        block_id: "duration_custom",
+        optional: true,
+        label: { type: "plain_text", text: "직접 입력 (분)" },
+        hint: { type: "plain_text", text: "위 선택 대신 분 단위로 — 예: 150. 입력하면 이 값이 우선합니다." },
+        element: {
+          type: "number_input",
+          action_id: "v",
+          is_decimal_allowed: false,
+          min_value: "15",
+          max_value: "480",
         },
       },
       {
@@ -139,7 +154,7 @@ export function candidateCard(
   ];
 }
 
-/** 완료 카드 — 이벤트 ID를 버튼에 심어 취소·변경이 무상태로 동작 */
+/** 완료 카드 — 이벤트 ID를 버튼에 심어 취소·변경이 무상태로 동작. 카드는 항상 현재 상태를 보여준다 */
 export function doneCard(params: {
   title: string;
   start: number;
@@ -148,15 +163,17 @@ export function doneCard(params: {
   eventId: string;
   htmlLink?: string;
   movePayload: string;
+  headline?: string;
 }): KnownBlock[] {
   const where = params.roomName ? `  ·  ${params.roomName}` : "";
   const link = params.htmlLink ? `\n<${params.htmlLink}|캘린더에서 보기>` : "";
+  const head = params.headline ?? "잡았어요.";
   return [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `:white_check_mark: *${params.title}* 잡았어요.\n${fmtSlot(params.start, params.end)}${where}${link}`,
+        text: `:white_check_mark: *${params.title}* ${head}\n${fmtSlot(params.start, params.end)}${where}${link}`,
       },
     },
     {
