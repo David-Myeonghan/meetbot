@@ -204,7 +204,8 @@ export function doneCard(params: {
           text: { type: "plain_text", text: "취소" },
           style: "danger",
           action_id: "cancel_meeting",
-          value: params.eventId,
+          value: params.movePayload, // 취소도 같은 payload — 참석자 알림에 제목·참석자가 필요
+
           confirm: {
             title: { type: "plain_text", text: "회의 취소" },
             text: { type: "plain_text", text: "초대를 회수하고 회의실을 반납합니다." },

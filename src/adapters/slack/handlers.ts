@@ -81,6 +81,19 @@ const BUSINESS_DAY_MS = 24 * 60 * 60_000;
 export function registerHandlers(app: App, deps: Deps): void {
   const opt = deps.engineOptions ?? defaultOptions;
 
+  /** 참석자 DM — 연동 여부와 무관한 슬랙 알림. 실패해도 예약 흐름을 막지 않는다 */
+  const notifyAttendees = (
+    client: { chat: { postMessage: (a: { channel: string; text: string }) => Promise<unknown> } },
+    attendeeIds: string[],
+    exceptId: string,
+    text: string,
+  ): void => {
+    for (const id of new Set(attendeeIds)) {
+      if (id === exceptId) continue;
+      client.chat.postMessage({ channel: id, text }).catch(() => {});
+    }
+  };
+
   // ── 진입: /meet → 폼 모달 ──
   app.command("/meet", async ({ ack, body, client }) => {
     await ack();
@@ -321,6 +334,12 @@ export function registerHandlers(app: App, deps: Deps): void {
       await historyReply(
         `:white_check_mark: <@${actorId}> 님이 잡음 — ${fmtSlot(p.s, p.e)}${p.room ? ` · ${p.room.name}` : ""}`,
       );
+      notifyAttendees(
+        client,
+        request.attendeeIds,
+        actorId,
+        `:calendar: <@${actorId}> 님이 회의를 잡았어요 — *${request.title}*\n${fmtSlot(p.s, p.e)}${p.room ? ` · ${p.room.name}` : ""} (캘린더 초대가 발송됐어요)`,
+      );
       // 확산 훅 — 실패해도 예약 흐름을 막지 않는다
       if (deps.spread) {
         deps.spread(request.attendeeIds, request.requesterId).catch(() => {});
@@ -362,11 +381,25 @@ export function registerHandlers(app: App, deps: Deps): void {
     }
   });
 
-  // ── [취소] — 카드는 취소 상태로 변신, 히스토리는 스레드에 ──
+  // ── [취소] — 카드는 취소 상태로 변신, 히스토리는 스레드에, 참석자에게 DM ──
   app.action("cancel_meeting", async ({ ack, body, action, client }) => {
     await ack();
     if (action.type !== "button") return;
-    const eventId = action.value ?? "";
+    // payload = MovePayload JSON (참석자 알림에 제목·참석자 필요). 구버전 카드는 생 eventId
+    let eventId = action.value ?? "";
+    let cancelInfo: { title: string; s: number; e: number; attendees: string[] } | undefined;
+    try {
+      const p = JSON.parse(action.value ?? "") as {
+        eventId: string;
+        s: number;
+        e: number;
+        req: CreatePayload["req"];
+      };
+      eventId = p.eventId;
+      cancelInfo = { title: p.req.t, s: p.s, e: p.e, attendees: p.req.a };
+    } catch {
+      /* 구버전 카드 — 알림 없이 취소만 */
+    }
     const actorId = body.user.id;
     const anchor = anchorOf(body);
     const asUser = await deps.emailOf(actorId);
@@ -374,6 +407,14 @@ export function registerHandlers(app: App, deps: Deps): void {
       { calendar: deps.calendar },
       { actorId, eventId, asUser },
     );
+    if (result.ok && cancelInfo) {
+      notifyAttendees(
+        client,
+        cancelInfo.attendees,
+        actorId,
+        `:no_entry_sign: <@${actorId}> 님이 회의를 취소했어요 — *${cancelInfo.title}*\n${fmtSlot(cancelInfo.s, cancelInfo.e)}`,
+      );
+    }
     if (result.ok) {
       await client.chat.update({
         channel: anchor.channel,
@@ -521,6 +562,12 @@ export function registerHandlers(app: App, deps: Deps): void {
         thread_ts: anchor.ts,
         text: `:arrows_counterclockwise: <@${actorId}> 님이 변경 — ${fmtSlot(raw.s, raw.e)} → ${fmtSlot(raw.ns, raw.ne)}`,
       });
+      notifyAttendees(
+        client,
+        raw.req.a,
+        actorId,
+        `:arrows_counterclockwise: <@${actorId}> 님이 회의 시간을 옮겼어요 — *${raw.req.t}*\n${fmtSlot(raw.s, raw.e)} → ${fmtSlot(raw.ns, raw.ne)}`,
+      );
     } else {
       // 실패 — 카드를 원래 완료 상태로 되돌리고 히스토리에 남긴다
       await client.chat.update({
