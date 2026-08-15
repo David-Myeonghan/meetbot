@@ -6,6 +6,9 @@ import type { UserStore } from "../store/users.js";
  * OAuth 콜백 — 개인 동의 모델의 연동 처리.
  * 최소 권한 스코프: 빈 시간 조회(freebusy) + 이벤트 생성·관리(events).
  * 캘린더 전체 읽기(readonly)는 요청하지 않는다 — 제목·내용을 읽지 않는 설계.
+ *
+ * state에 연동 카드의 좌표(ch, ts)를 실어 보내면, 동의 완료 시
+ * 그 카드를 "연동 완료" 상태로 제자리 갱신한다 (카드 = 항상 현재 상태 원칙).
  */
 
 const SCOPES = [
@@ -13,13 +16,23 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ];
 
-export function authUrlFor(slackUserId: string, email: string): string {
+export function authUrlFor(
+  slackUserId: string,
+  email: string,
+  cardChannel?: string,
+  cardTs?: string,
+): string {
   const auth = oauthClient();
   return auth.generateAuthUrl({
     access_type: "offline", // refresh token — 다음 요청부터 재동의 없이 대행
     prompt: "consent",
     scope: SCOPES,
-    state: JSON.stringify({ u: slackUserId, e: email }),
+    state: JSON.stringify({
+      u: slackUserId,
+      e: email,
+      ...(cardChannel ? { ch: cardChannel } : {}),
+      ...(cardTs ? { ts: cardTs } : {}),
+    }),
   });
 }
 
@@ -31,7 +44,11 @@ function oauthClient() {
   );
 }
 
-export function startOAuthServer(store: UserStore): void {
+export function startOAuthServer(
+  store: UserStore,
+  /** 연동 완료 시 연동 카드를 제자리 갱신하는 훅 (실패해도 연동 자체는 성공) */
+  onLinked?: (info: { slackUserId: string; email: string; cardChannel?: string; cardTs?: string }) => Promise<void>,
+): void {
   const redirect = process.env["GOOGLE_OAUTH_REDIRECT"] ?? "http://localhost:3355/oauth/callback";
   const port = Number(new URL(redirect).port || 3355);
 
@@ -46,12 +63,22 @@ export function startOAuthServer(store: UserStore): void {
       const state = JSON.parse(url.searchParams.get("state") ?? "{}") as {
         u?: string;
         e?: string;
+        ch?: string;
+        ts?: string;
       };
       if (!code || !state.u || !state.e) throw new Error("잘못된 콜백");
       const auth = oauthClient();
       const { tokens } = await auth.getToken(code);
       if (!tokens.refresh_token) throw new Error("refresh token 없음 — 재동의 필요");
       store.saveToken(state.u, state.e, tokens.refresh_token);
+      if (onLinked) {
+        await onLinked({
+          slackUserId: state.u,
+          email: state.e,
+          ...(state.ch ? { cardChannel: state.ch } : {}),
+          ...(state.ts ? { cardTs: state.ts } : {}),
+        }).catch(() => {});
+      }
       res
         .writeHead(200, { "content-type": "text/html; charset=utf-8" })
         .end("<h3>연동 완료 — 슬랙으로 돌아가 /meet 를 다시 실행하세요.</h3>");

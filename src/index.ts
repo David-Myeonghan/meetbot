@@ -32,7 +32,24 @@ async function main(): Promise<void> {
     const store = new UserStore(required("TOKEN_ENC_KEY"));
     calendar = new GoogleCalendar(store);
     authUrlFor = makeAuthUrl;
-    startOAuthServer(store);
+    // 연동 완료 시 연동 카드를 제자리 갱신 (카드 = 항상 현재 상태)
+    startOAuthServer(store, async ({ cardChannel, cardTs }) => {
+      if (!cardChannel || !cardTs) return;
+      await app.client.chat.update({
+        channel: cardChannel,
+        ts: cardTs,
+        text: "연동 완료",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: ":white_check_mark: *캘린더 연동 완료* — 이제 `/meet` 한 번으로 바로 잡을 수 있어요.",
+            },
+          },
+        ],
+      });
+    });
   } else {
     const fake = new FakeCalendar(new URL("../data/fake-calendar.json", import.meta.url).pathname);
     calendar = fake;

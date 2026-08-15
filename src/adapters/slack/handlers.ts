@@ -38,8 +38,8 @@ interface Deps {
   engineOptions?: EngineOptions;
   /** 슬랙 user ID → 캘린더 이메일 (사내면 프로필 이메일 = 캘린더 계정) */
   emailOf: (userId: string) => Promise<string>;
-  /** 연동 URL (google 어댑터일 때) — 없으면 fake 어댑터로 간주 */
-  authUrlFor?: (userId: string, email: string) => string;
+  /** 연동 URL (google 어댑터일 때) — 없으면 fake 어댑터로 간주. 카드 좌표를 주면 완료 시 카드가 갱신됨 */
+  authUrlFor?: (userId: string, email: string, cardChannel?: string, cardTs?: string) => string;
   /**
    * 확산 훅 (전사 오픈 단계, ENABLE_SPREAD) — 생성의 부수 동작.
    * 미연동·미발송 참석자에게 한 번만 알림. 탐지가 아니라 생성 시점의 대조.
@@ -189,32 +189,43 @@ export function registerHandlers(app: App, deps: Deps): void {
         (e as { kind: string }).kind === "no_permission" &&
         deps.authUrlFor
       ) {
-        await client.chat.postMessage({
+        const noticeBlock = {
+          type: "section" as const,
+          text: {
+            type: "mrkdwn" as const,
+            text:
+              "*처음이시네요 — 캘린더 연동이 필요해요.*\n봇이 쓰는 권한은 두 가지뿐입니다.\n• 참석자들의 *빈 시간 여부* 조회 (제목·내용은 읽지 않아요)\n• *내 이름으로* 하는 회의 생성·관리",
+          },
+        };
+        // 카드를 먼저 띄워 좌표(channel, ts)를 얻고, 그 좌표를 OAuth state에 실은
+        // 버튼으로 갱신 — 동의가 끝나면 콜백이 이 카드를 "연동 완료"로 바꾼다
+        const posted = await client.chat.postMessage({
           channel: requesterId,
           text: "캘린더 연동이 필요해요.",
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text:
-                  "*처음이시네요 — 캘린더 연동이 필요해요.*\n봇이 쓰는 권한은 두 가지뿐입니다.\n• 참석자들의 *빈 시간 여부* 조회 (제목·내용은 읽지 않아요)\n• *내 이름으로* 하는 회의 생성·관리",
-              },
-            },
-            {
-              type: "actions",
-              elements: [
-                {
-                  type: "button",
-                  style: "primary",
-                  text: { type: "plain_text", text: "연동하기" },
-                  action_id: "noop_link",
-                  url: deps.authUrlFor(requesterId, requesterEmail),
-                },
-              ],
-            },
-          ],
+          blocks: [noticeBlock],
         });
+        if (posted.channel && posted.ts) {
+          await client.chat.update({
+            channel: posted.channel,
+            ts: posted.ts,
+            text: "캘린더 연동이 필요해요.",
+            blocks: [
+              noticeBlock,
+              {
+                type: "actions",
+                elements: [
+                  {
+                    type: "button",
+                    style: "primary",
+                    text: { type: "plain_text", text: "연동하기" },
+                    action_id: "noop_link",
+                    url: deps.authUrlFor(requesterId, requesterEmail, posted.channel, posted.ts),
+                  },
+                ],
+              },
+            ],
+          });
+        }
         return;
       }
       throw e;
