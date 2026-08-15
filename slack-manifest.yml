@@ -1,0 +1,30 @@
+# mydav12 워크스페이스용 슬랙 앱 manifest
+# 사용법: https://api.slack.com/apps → Create New App → From a manifest → mydav12 선택 → 아래 붙여넣기
+# 생성 후: Basic Information → App-Level Tokens에서 connections:write 스코프로 토큰 생성 (SLACK_APP_TOKEN)
+#         Install App → Bot User OAuth Token 복사 (SLACK_BOT_TOKEN)
+display_information:
+  name: 회의봇
+  description: 공통 빈 시간을 찾아 회의를 잡아주는 봇
+  background_color: "#0E7C7B"
+features:
+  bot_user:
+    display_name: 회의봇
+    always_online: true
+  slash_commands:
+    - command: /meet
+      description: 회의 잡기 — 참석자와 조건을 입력하면 공통 빈 시간 후보를 제시
+      usage_hint: "[그냥 입력하면 폼이 열립니다]"
+      should_escape: false
+oauth_config:
+  scopes:
+    bot:
+      - commands        # /meet
+      - chat:write      # 카드 발송
+      - users:read      # 참석자 표시명
+      - users:read.email # 슬랙 사용자 ↔ 캘린더 계정 매핑 (이메일)
+settings:
+  interactivity:
+    is_enabled: true
+  socket_mode_enabled: true
+  org_deploy_enabled: false
+  token_rotation_enabled: false
