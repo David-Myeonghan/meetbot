@@ -231,12 +231,23 @@ export function registerHandlers(app: App, deps: Deps): void {
       throw e;
     }
     const rooms = needsRoom ? await deps.calendar.listRooms(requesterEmail) : [];
+    // 방도 캘린더 — 사람과 같은 free/busy 경로로 바쁨을 조회해 중복 예약을 막는다
+    const roomBusy =
+      rooms.length > 0
+        ? await deps.calendar.getBusy(
+            rooms.map((r) => r.id),
+            request.windowStart,
+            request.windowEnd,
+            requesterEmail,
+          )
+        : new Map();
     const input = {
       busyByPerson: busy,
       durationMinutes: duration,
       windowStart: request.windowStart,
       windowEnd: request.windowEnd,
       rooms,
+      roomBusy,
       headcount: allIds.length,
       needsRoom,
     };

@@ -41,9 +41,10 @@ export async function createBooking(
     requestId,
   });
 
-  // 생성 직전 재검증 — 후보 제시와 클릭 사이에 슬롯이 선점됐을 수 있다
+  // 생성 직전 재검증 — 후보 제시와 클릭 사이에 슬롯이 선점됐을 수 있다.
+  // 방도 캘린더이므로 같은 조회에 포함해 방 선점까지 잡는다
   const busy = await calendar.getBusy(
-    attendeeEmails,
+    [...attendeeEmails, ...(slot.room ? [slot.room.id] : [])],
     slot.start,
     slot.end,
     requesterEmail,
@@ -66,6 +67,15 @@ export async function createBooking(
       requesterEmail,
     );
     const rooms = request.needsRoom ? await calendar.listRooms(requesterEmail) : [];
+    const roomBusy =
+      rooms.length > 0
+        ? await calendar.getBusy(
+            rooms.map((r) => r.id),
+            request.windowStart,
+            request.windowEnd,
+            requesterEmail,
+          )
+        : new Map();
     const freshCandidates = findCandidates(
       {
         busyByPerson: freshBusy,
@@ -73,6 +83,7 @@ export async function createBooking(
         windowStart: request.windowStart,
         windowEnd: request.windowEnd,
         rooms,
+        roomBusy,
         headcount: attendeeEmails.length,
         needsRoom: request.needsRoom,
       },

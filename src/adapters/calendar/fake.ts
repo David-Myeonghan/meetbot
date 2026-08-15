@@ -67,9 +67,10 @@ export class FakeCalendar implements CalendarPort {
     const out: BusyByPerson = new Map();
     for (const email of emails) {
       const all = this.busy.get(email) ?? [];
-      // 생성된 이벤트도 바쁜 구간에 반영 (재검증이 실제로 동작하게)
+      // 생성된 이벤트도 바쁜 구간에 반영 (재검증이 실제로 동작하게).
+      // 방(roomEmail)도 캘린더이므로 같은 경로로 바쁨이 조회된다
       const fromEvents = [...this.events.values()]
-        .filter((e) => e.attendees.includes(email))
+        .filter((e) => e.attendees.includes(email) || e.roomEmail === email)
         .map((e) => ({ start: e.start, end: e.end }));
       out.set(
         email,
