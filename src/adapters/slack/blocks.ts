@@ -124,6 +124,14 @@ export function meetingForm(durationValue: string = "30"): View {
         element: {
           type: "checkboxes",
           action_id: "v",
+          // 기본 체크 — 사무실 조직의 다수 케이스. 화상 회의면 끄면 되고,
+          // 방이 필요 없는 회의에까지 잡으면 봇이 유령 예약을 만들게 되므로 필드 자체는 유지
+          initial_options: [
+            {
+              text: { type: "plain_text", text: "회의실 필요 (인원에 맞는 가장 작은 빈 방을 자동으로 잡습니다)" },
+              value: "needs_room",
+            },
+          ],
           options: [
             {
               text: { type: "plain_text", text: "회의실 필요 (인원에 맞는 가장 작은 빈 방을 자동으로 잡습니다)" },
