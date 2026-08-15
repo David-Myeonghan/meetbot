@@ -136,6 +136,23 @@ export class GoogleCalendar implements CalendarPort {
     }
   }
 
+  async roomResponse(
+    eventId: string,
+    roomEmail: string,
+    asUser: string,
+  ): Promise<"accepted" | "declined" | "pending"> {
+    const cal = this.clientFor(asUser);
+    try {
+      const res = await cal.events.get({ calendarId: "primary", eventId });
+      const room = res.data.attendees?.find((a) => a.email === roomEmail);
+      if (room?.responseStatus === "declined") return "declined";
+      if (room?.responseStatus === "accepted") return "accepted";
+      return "pending";
+    } catch (e) {
+      throw this.translate(e);
+    }
+  }
+
   async cancelEvent(eventId: string, asUser: string): Promise<void> {
     const cal = this.clientFor(asUser);
     try {

@@ -35,6 +35,16 @@ export interface CalendarPort {
     asUser: string;
   }): Promise<CreatedEvent>;
 
+  /**
+   * 방(리소스 참석자)의 수락 상태. 리소스 캘린더는 충돌 시 사후에 자동 거절하므로
+   * 생성 직후 이 값을 재조회해 "완료 카드는 떴는데 방은 없는" 사고를 봇이 스스로 잡는다.
+   */
+  roomResponse(
+    eventId: string,
+    roomEmail: string,
+    asUser: string,
+  ): Promise<"accepted" | "declined" | "pending">;
+
   cancelEvent(eventId: string, asUser: string): Promise<void>;
 
   moveEvent(

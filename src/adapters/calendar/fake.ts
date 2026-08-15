@@ -111,6 +111,23 @@ export class FakeCalendar implements CalendarPort {
     return { eventId };
   }
 
+  async roomResponse(
+    eventId: string,
+    roomEmail: string,
+  ): Promise<"accepted" | "declined" | "pending"> {
+    const ev = this.events.get(eventId);
+    if (!ev) return "pending";
+    // 같은 방을 쓰는 다른 이벤트와 겹치면 리소스 캘린더의 자동 거절을 모사
+    const conflict = [...this.events.entries()].some(
+      ([id, other]) =>
+        id !== eventId &&
+        other.roomEmail === roomEmail &&
+        other.start < ev.end &&
+        other.end > ev.start,
+    );
+    return conflict ? "declined" : "accepted";
+  }
+
   async cancelEvent(eventId: string): Promise<void> {
     if (!this.events.has(eventId)) {
       throw new CalendarError("not_found", `event ${eventId} not found`);

@@ -367,6 +367,34 @@ export function registerHandlers(app: App, deps: Deps): void {
         actorId,
         `:calendar: <@${actorId}> 님이 회의를 잡았어요 — *${request.title}*\n${fmtSlot(p.s, p.e)}${p.room ? ` · ${p.room.name}` : ""} (캘린더 초대가 발송됐어요)`,
       );
+      // 생성 직후 방 수락 확인 — 리소스 캘린더는 충돌 시 사후에 자동 거절하므로
+      // 재검증이 못 닫는 마지막 겹침을 여기서 잡는다 ("오예약 0건"을 봇이 스스로 측정)
+      if (p.room) {
+        const room = p.room;
+        setTimeout(async () => {
+          try {
+            const status = await deps.calendar.roomResponse(
+              result.eventId,
+              room.id,
+              requesterEmail,
+            );
+            if (status === "declined") {
+              audit({
+                actor: request.requesterId,
+                action: "room_declined",
+                eventId: result.eventId,
+              });
+              await client.chat.postMessage({
+                channel: anchor.channel,
+                thread_ts: anchor.ts,
+                text: `:rotating_light: ${room.name}이(가) 예약을 거절했어요(그 사이 선점). 회의는 잡혔지만 방이 없습니다. [시간 변경]으로 재조율하거나 캘린더에서 방을 바꿔 주세요.`,
+              });
+            }
+          } catch {
+            /* 확인 실패는 예약 흐름을 막지 않는다 */
+          }
+        }, 5000);
+      }
       // 확산 훅 — 실패해도 예약 흐름을 막지 않는다
       if (deps.spread) {
         deps.spread(request.attendeeIds, request.requesterId).catch(() => {});

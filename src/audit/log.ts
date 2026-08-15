@@ -15,6 +15,7 @@ export type AuditAction =
   | "create_succeeded"  // 생성 성공률 분자 / 채택률 분자
   | "create_failed"
   | "revalidation_conflict" // 재검증이 잡은 선점
+  | "room_declined"       // 방의 사후 자동 거절 — 오예약 0건 게이트의 측정 대상
   | "cancel"
   | "move"
   | "spread_nudge_sent";
