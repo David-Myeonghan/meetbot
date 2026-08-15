@@ -24,8 +24,21 @@ export function fmtSlot(start: number, end: number): string {
   return `${day} ${time.format(new Date(start))}–${time.format(new Date(end))}`;
 }
 
-/** 폼 모달 — 요청 스키마 {참석자, 소요 시간, 기간 창, 회의실 필요 여부} + 제목 */
-export function meetingForm(): View {
+const DURATION_OPTIONS = [
+  { text: { type: "plain_text" as const, text: "30분" }, value: "30" },
+  { text: { type: "plain_text" as const, text: "1시간" }, value: "60" },
+  { text: { type: "plain_text" as const, text: "1시간 30분" }, value: "90" },
+  { text: { type: "plain_text" as const, text: "2시간" }, value: "120" },
+  { text: { type: "plain_text" as const, text: "직접 입력…" }, value: "custom" },
+];
+
+/**
+ * 폼 모달 — 요청 스키마 {참석자, 소요 시간, 기간 창, 회의실 필요 여부} + 제목.
+ * durationValue가 "custom"이면 분 단위 직접 입력 칸이 나타난다
+ * (드롭다운의 dispatch_action → views.update로 같은 모달을 갱신하는 슬랙 표준 패턴).
+ */
+export function meetingForm(durationValue: string = "30"): View {
+  const showCustom = durationValue === "custom";
   return {
     type: "modal",
     callback_id: "meet_form",
@@ -56,36 +69,35 @@ export function meetingForm(): View {
       {
         type: "input",
         block_id: "duration",
+        dispatch_action: true, // "직접 입력…" 선택 시 입력 칸을 붙이기 위한 이벤트
         label: { type: "plain_text", text: "소요 시간" },
         element: {
           type: "static_select",
-          action_id: "v",
-          initial_option: {
-            text: { type: "plain_text", text: "30분" },
-            value: "30",
-          },
-          options: [
-            { text: { type: "plain_text", text: "30분" }, value: "30" },
-            { text: { type: "plain_text", text: "1시간" }, value: "60" },
-            { text: { type: "plain_text", text: "1시간 30분" }, value: "90" },
-            { text: { type: "plain_text", text: "2시간" }, value: "120" },
-          ],
+          action_id: "duration_select",
+          initial_option:
+            DURATION_OPTIONS.find((o) => o.value === durationValue) ??
+            DURATION_OPTIONS[0]!,
+          options: DURATION_OPTIONS,
         },
       },
-      {
-        type: "input",
-        block_id: "duration_custom",
-        optional: true,
-        label: { type: "plain_text", text: "직접 입력 (분)" },
-        hint: { type: "plain_text", text: "위 선택 대신 분 단위로 — 예: 150. 입력하면 이 값이 우선합니다." },
-        element: {
-          type: "number_input",
-          action_id: "v",
-          is_decimal_allowed: false,
-          min_value: "15",
-          max_value: "480",
-        },
-      },
+      ...(showCustom
+        ? [
+            {
+              type: "input" as const,
+              block_id: "duration_custom",
+              optional: true,
+              label: { type: "plain_text" as const, text: "소요 시간 직접 입력 (분)" },
+              hint: { type: "plain_text" as const, text: "예: 150 (15~480분)" },
+              element: {
+                type: "number_input" as const,
+                action_id: "v",
+                is_decimal_allowed: false,
+                min_value: "15",
+                max_value: "480",
+              },
+            },
+          ]
+        : []),
       {
         type: "input",
         block_id: "window",

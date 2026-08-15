@@ -91,15 +91,45 @@ export function registerHandlers(app: App, deps: Deps): void {
     });
   });
 
+  // ── 소요 시간 드롭다운 변경 → "직접 입력…" 선택 시 입력 칸을 붙인 모달로 갱신 ──
+  app.action("duration_select", async ({ ack, body, action, client }) => {
+    await ack();
+    if (action.type !== "static_select") return;
+    const val = action.selected_option?.value ?? "30";
+    const view = (body as { view?: { id: string; hash: string; blocks?: { block_id?: string }[] } }).view;
+    if (!view) return;
+    const hasCustom = view.blocks?.some((b) => b.block_id === "duration_custom") ?? false;
+    // 커스텀 칸의 유무가 바뀔 때만 갱신 (다른 입력값은 block_id가 같아 보존됨)
+    if ((val === "custom") !== hasCustom) {
+      await client.views.update({
+        view_id: view.id,
+        hash: view.hash,
+        view: meetingForm(val),
+      });
+    }
+  });
+
   // ── 폼 제출 → 엔진(읽기) → 후보 카드 ──
   app.view("meet_form", async ({ ack, body, view, client }) => {
     const v = view.state.values;
     const title = v["title"]?.["v"]?.value ?? "회의";
     const attendeeIds = v["attendees"]?.["v"]?.selected_users ?? [];
-    const customDuration = v["duration_custom"]?.["v"]?.value;
-    const duration = customDuration
-      ? Number(customDuration)
-      : Number(v["duration"]?.["v"]?.selected_option?.value ?? 30);
+    const durationSel =
+      v["duration"]?.["duration_select"]?.selected_option?.value ?? "30";
+    let duration: number;
+    if (durationSel === "custom") {
+      const custom = v["duration_custom"]?.["v"]?.value;
+      if (!custom) {
+        await ack({
+          response_action: "errors",
+          errors: { duration_custom: "분 단위 숫자를 입력해 주세요 (예: 150)." },
+        });
+        return;
+      }
+      duration = Number(custom);
+    } else {
+      duration = Number(durationSel);
+    }
     const windowDays = Number(v["window"]?.["v"]?.selected_option?.value ?? 5);
     const needsRoom =
       (v["room"]?.["v"]?.selected_options ?? []).length > 0;
