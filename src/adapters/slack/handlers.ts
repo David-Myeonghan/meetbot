@@ -220,7 +220,7 @@ export function registerHandlers(app: App, deps: Deps): void {
   });
 
   // ── [이 시간으로 잡기] → 실행기(쓰기) → 완료/실패 카드 ──
-  app.action("create_meeting", async ({ ack, body, action, client }) => {
+  app.action("create_meeting", async ({ ack, body, action, client, respond }) => {
     await ack();
     if (action.type !== "button") return;
     const p = JSON.parse(action.value ?? "{}") as CreatePayload;
@@ -248,8 +248,9 @@ export function registerHandlers(app: App, deps: Deps): void {
 
     const channel = actorId;
     if (result.kind === "created") {
-      await client.chat.postMessage({
-        channel,
+      // 후보 카드를 완료 카드로 교체 — 고른 뒤에도 옛 버튼이 남아 눌리는 것을 막는다
+      await respond({
+        replace_original: true,
         text: "회의를 잡았어요.",
         blocks: doneCard({
           title: request.title,
@@ -269,14 +270,15 @@ export function registerHandlers(app: App, deps: Deps): void {
     } else if (result.kind === "slot_taken") {
       const head = "그 사이 그 시간이 선점됐어요. 새 후보를 다시 찾았습니다.";
       if (result.freshCandidates.length === 0) {
-        await client.chat.postMessage({
-          channel,
+        await respond({
+          replace_original: true,
           text: head,
           blocks: failCard(head, "기간을 넓히거나 인원을 조정해 다시 시도해 보세요."),
         });
       } else {
-        await client.chat.postMessage({
-          channel,
+        // 낡은 후보 카드를 새 후보로 교체 — 선점된 슬롯 버튼이 남지 않게
+        await respond({
+          replace_original: true,
           text: head,
           blocks: [
             ...failCard(head, "아래에서 다시 골라 주세요."),
