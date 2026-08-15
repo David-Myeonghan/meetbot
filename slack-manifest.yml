@@ -3,7 +3,7 @@
 # 생성 후: Basic Information → App-Level Tokens에서 connections:write 스코프로 토큰 생성 (SLACK_APP_TOKEN)
 #         Install App → Bot User OAuth Token 복사 (SLACK_BOT_TOKEN)
 display_information:
-  name: 회의봇
+  name: meetBot
   description: 공통 빈 시간을 찾아 회의를 잡아주는 봇
   background_color: "#0E7C7B"
 features:
