@@ -34,7 +34,7 @@ async function main(): Promise<void> {
     authUrlFor = makeAuthUrl;
     startOAuthServer(store);
   } else {
-    const fake = new FakeCalendar();
+    const fake = new FakeCalendar(new URL("../data/fake-calendar.json", import.meta.url).pathname);
     calendar = fake;
     console.log(JSON.stringify({ ts: new Date().toISOString(), msg: "가짜 캘린더 어댑터로 동작 — CALENDAR_ADAPTER=google로 실제 전환" }));
   }

@@ -194,14 +194,15 @@ export function registerHandlers(app: App, deps: Deps): void {
       return;
     }
 
-    const rid = newRequestId();
-    audit({ actor: requesterId, action: "candidates_shown", requestId: rid });
+    audit({ actor: requesterId, action: "candidates_shown" });
     await client.chat.postMessage({
       channel: requesterId,
       text: "회의 시간 후보가 도착했어요.",
+      // 요청 ID는 버튼(슬롯)별로 — 멱등의 단위는 "이 슬롯의 생성"이다.
+      // 카드 전체가 공유하면 A 생성 후 B 클릭이 A의 이벤트를 돌려받는 오답이 된다.
       blocks: candidateCard(candidates, (c) =>
         JSON.stringify({
-          rid,
+          rid: newRequestId(),
           s: c.start,
           e: c.end,
           ...(c.room ? { room: c.room } : {}),
